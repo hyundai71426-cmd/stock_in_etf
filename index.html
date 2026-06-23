@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ETF 구성종목 검색</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161922;
+    --border: #262b36;
+    --text: #e8eaf0;
+    --muted: #8b92a3;
+    --accent: #5b8cff;
+    --accent-soft: rgba(91, 140, 255, 0.15);
+    --up: #ff5b5b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Pretendard", "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 6px;
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0 0 28px;
+  }
+  .search-box {
+    display: flex;
+    gap: 8px;
+  }
+  input[type="text"] {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 15px;
+    outline: none;
+  }
+  input[type="text"]:focus { border-color: var(--accent); }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 14px 22px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .chip {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .chip:hover { color: var(--text); border-color: var(--accent); }
+
+  .panel {
+    margin-top: 24px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .result-item {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .result-item:last-child { border-bottom: none; }
+  .result-item:hover { background: var(--accent-soft); }
+  .result-name { font-weight: 600; font-size: 14px; }
+  .result-meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .result-code { color: var(--muted); font-size: 13px; }
+
+  .detail-header {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-title { font-size: 17px; font-weight: 700; }
+  .detail-meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td {
+    text-align: left;
+    padding: 10px 18px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 12px;
+  }
+  td.num, th.num { text-align: right; }
+  tr:last-child td { border-bottom: none; }
+
+  .weight-bar {
+    display: inline-block;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-left: 8px;
+  }
+
+  .state {
+    padding: 30px 18px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .back-link {
+    display: inline-block;
+    margin-top: 16px;
+    color: var(--accent);
+    font-size: 13px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ETF 구성종목 검색</h1>
+  <p class="sub">종목명 또는 종목코드를 입력하면 국내 ETF의 구성종목을 보여줍니다. (KRX 데이터 기준)</p>
+
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="예: KODEX 200, 069500" autocomplete="off" />
+    <button id="searchBtn">검색</button>
+  </div>
+
+  <div class="chips" id="chips">
+    <span class="chip" data-q="KODEX 200">KODEX 200</span>
+    <span class="chip" data-q="TIGER 200">TIGER 200</span>
+    <span class="chip" data-q="KODEX 2차전지산업">KODEX 2차전지산업</span>
+    <span class="chip" data-q="TIGER 미국S&P500">TIGER 미국S&P500</span>
+    <span class="chip" data-q="KODEX 반도체">KODEX 반도체</span>
+  </div>
+
+  <div class="panel" id="resultPanel" style="display:none;"></div>
+</div>
+
+<script>
+const $input = document.getElementById('searchInput');
+const $btn = document.getElementById('searchBtn');
+const $panel = document.getElementById('resultPanel');
+const $chips = document.getElementById('chips');
+
+function showState(html) {
+  $panel.style.display = 'block';
+  $panel.innerHTML = `<div class="state">${html}</div>`;
+}
+
+async function search(q) {
+  if (!q) return;
+  showState('검색 중...');
+  try {
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (!res.ok) { showState(data.error || '검색에 실패했습니다.'); return; }
+    if (data.count === 0) { showState('검색 결과가 없습니다.'); return; }
+    renderResults(data.results);
+  } catch (e) {
+    showState('네트워크 오류가 발생했습니다.');
+  }
+}
+
+function renderResults(results) {
+  $panel.style.display = 'block';
+  $panel.innerHTML = results.map(r => `
+    <div class="result-item" data-isin="${r.isin}" data-name="${r.name}">
+      <div>
+        <div class="result-name">${r.name}</div>
+        <div class="result-meta">${r.company || ''} ${r.indexName ? '· ' + r.indexName : ''}</div>
+      </div>
+      <div class="result-code">${r.code}</div>
+    </div>
+  `).join('');
+
+  $panel.querySelectorAll('.result-item').forEach(el => {
+    el.addEventListener('click', () => {
+      loadHoldings(el.dataset.isin, el.dataset.name);
+    });
+  });
+}
+
+async function loadHoldings(isin, name) {
+  showState('구성종목 불러오는 중...');
+  try {
+    const res = await fetch(`/api/holdings?isin=${encodeURIComponent(isin)}`);
+    const data = await res.json();
+    if (!res.ok) { showState(data.error || '조회에 실패했습니다.'); return; }
+    renderHoldings(name, data);
+  } catch (e) {
+    showState('네트워크 오류가 발생했습니다.');
+  }
+}
+
+function renderHoldings(name, data) {
+  const maxWeight = Math.max(...data.holdings.map(h => parseFloat(h.weight) || 0), 1);
+  const rows = data.holdings.map(h => {
+    const w = parseFloat(h.weight) || 0;
+    const barWidth = Math.max((w / maxWeight) * 60, 2);
+    return `
+      <tr>
+        <td>${h.name}</td>
+        <td class="num">${h.code}</td>
+        <td class="num">${h.weight}%<span class="weight-bar" style="width:${barWidth}px"></span></td>
+      </tr>
+    `;
+  }).join('');
+
+  $panel.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-title">${name}</div>
+      <div class="detail-meta">기준일 ${data.date} · 구성종목 ${data.count}개</div>
+      <span class="back-link" id="backLink">← 다시 검색</span>
+    </div>
+    <table>
+      <thead>
+        <tr><th>종목명</th><th class="num">코드</th><th class="num">비중</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+
+  document.getElementById('backLink').addEventListener('click', () => {
+    $panel.style.display = 'none';
+  });
+}
+
+$btn.addEventListener('click', () => search($input.value.trim()));
+$input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') search($input.value.trim());
+});
+$chips.addEventListener('click', (e) => {
+  if (e.target.classList.contains('chip')) {
+    $input.value = e.target.dataset.q;
+    search(e.target.dataset.q);
+  }
+});
+</script>
+</body>
+</html>
