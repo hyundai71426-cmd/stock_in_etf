@@ -145,6 +145,53 @@
     font-size: 13px;
     cursor: pointer;
   }
+
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    max-width: 360px;
+    width: 100%;
+    padding: 24px;
+  }
+  .modal-title { font-size: 16px; font-weight: 700; margin: 0 0 10px; }
+  .modal-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin: 0 0 20px;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .modal-actions button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 14px;
+  }
+  .modal-cancel {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .modal-confirm {
+    background: var(--accent);
+    color: white;
+    border: none;
+  }
 </style>
 </head>
 <body>
@@ -168,12 +215,54 @@
   <div class="panel" id="resultPanel" style="display:none;"></div>
 </div>
 
+<div class="modal-overlay" id="couponModal">
+  <div class="modal-box">
+    <p class="modal-title">구성종목을 확인하기 전에</p>
+    <p class="modal-desc">
+      이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.<br><br>
+      "이동" 버튼을 누르면 쿠팡 페이지가 새 탭으로 열리고, 곧이어 구성종목 결과를 확인할 수 있습니다.
+    </p>
+    <div class="modal-actions">
+      <button class="modal-cancel" id="modalCancelBtn">취소</button>
+      <button class="modal-confirm" id="modalConfirmBtn">이동하고 결과 보기</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const $input = document.getElementById('searchInput');
 const $btn = document.getElementById('searchBtn');
 const $panel = document.getElementById('resultPanel');
 const $chips = document.getElementById('chips');
+const $modal = document.getElementById('couponModal');
+const $modalCancel = document.getElementById('modalCancelBtn');
+const $modalConfirm = document.getElementById('modalConfirmBtn');
 const COUPANG_LINK = 'https://link.coupang.com/a/ePWBlDKfym';
+
+let pendingHolding = null;
+
+function openCouponModal(source, id, name) {
+  pendingHolding = { source, id, name };
+  $modal.classList.add('visible');
+}
+
+function closeCouponModal() {
+  $modal.classList.remove('visible');
+  pendingHolding = null;
+}
+
+$modalCancel.addEventListener('click', closeCouponModal);
+$modal.addEventListener('click', (e) => {
+  if (e.target === $modal) closeCouponModal();
+});
+$modalConfirm.addEventListener('click', () => {
+  if (!pendingHolding) return;
+  const { source, id, name } = pendingHolding;
+  window.open(COUPANG_LINK, '_blank', 'noopener');
+  $modal.classList.remove('visible');
+  loadHoldings(source, id, name);
+  pendingHolding = null;
+});
 
 function showState(html) {
   $panel.style.display = 'block';
@@ -208,8 +297,7 @@ function renderResults(results) {
 
   $panel.querySelectorAll('.result-item').forEach(el => {
     el.addEventListener('click', () => {
-      window.open(COUPANG_LINK, '_blank', 'noopener');
-      loadHoldings(el.dataset.source, el.dataset.id, el.dataset.name);
+      openCouponModal(el.dataset.source, el.dataset.id, el.dataset.name);
     });
   });
 }
