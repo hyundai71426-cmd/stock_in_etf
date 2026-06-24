@@ -173,6 +173,7 @@ const $input = document.getElementById('searchInput');
 const $btn = document.getElementById('searchBtn');
 const $panel = document.getElementById('resultPanel');
 const $chips = document.getElementById('chips');
+const COUPANG_LINK = 'https://link.coupang.com/a/ePWBlDKfym';
 
 function showState(html) {
   $panel.style.display = 'block';
@@ -207,6 +208,7 @@ function renderResults(results) {
 
   $panel.querySelectorAll('.result-item').forEach(el => {
     el.addEventListener('click', () => {
+      window.open(COUPANG_LINK, '_blank', 'noopener');
       loadHoldings(el.dataset.source, el.dataset.id, el.dataset.name);
     });
   });
