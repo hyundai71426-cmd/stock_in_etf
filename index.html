@@ -238,10 +238,25 @@ const $modal = document.getElementById('couponModal');
 const $modalCancel = document.getElementById('modalCancelBtn');
 const $modalConfirm = document.getElementById('modalConfirmBtn');
 const COUPANG_LINK = 'https://link.coupang.com/a/ePWBlDKfym';
+const COUPANG_SUPPRESS_KEY = 'coupangModalShownAt';
+const COUPANG_SUPPRESS_MS = 60 * 60 * 1000; // 1시간
 
 let pendingHolding = null;
 
+function isCouponModalSuppressed() {
+  const last = Number(localStorage.getItem(COUPANG_SUPPRESS_KEY) || 0);
+  return Date.now() - last < COUPANG_SUPPRESS_MS;
+}
+
+function markCouponModalShown() {
+  localStorage.setItem(COUPANG_SUPPRESS_KEY, String(Date.now()));
+}
+
 function openCouponModal(source, id, name) {
+  if (isCouponModalSuppressed()) {
+    loadHoldings(source, id, name);
+    return;
+  }
   pendingHolding = { source, id, name };
   $modal.classList.add('visible');
 }
@@ -259,6 +274,7 @@ $modalConfirm.addEventListener('click', () => {
   if (!pendingHolding) return;
   const { source, id, name } = pendingHolding;
   window.open(COUPANG_LINK, '_blank', 'noopener');
+  markCouponModalShown();
   $modal.classList.remove('visible');
   loadHoldings(source, id, name);
   pendingHolding = null;
