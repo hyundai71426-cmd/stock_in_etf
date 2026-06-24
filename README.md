@@ -5,14 +5,16 @@
 ## 구조
 - `index.html` — 검색 UI (정적 파일)
 - `api/search.py` — 종목명/코드로 ETF 찾기 (`GET /api/search?q=검색어`)
-- `api/holdings.py` — ETF 구성종목 조회 (`GET /api/holdings?source=KODEX|TIGER&id=식별자`)
+- `api/holdings.py` — ETF 구성종목 조회 (`GET /api/holdings?source=KODEX|TIGER|ACE&id=식별자`)
 
 KRX 정보데이터시스템(data.krx.co.kr)이 2026년 1월부터 로그인을 요구하도록 바뀌어
 더 이상 비로그인으로 사용할 수 없습니다. 대신 각 자산운용사가 회원가입 없이 공개하는
 데이터를 직접 수집합니다.
 - KODEX(삼성자산운용): `samsungfund.com` 공개 API
 - TIGER(미래에셋자산운용): `investments.miraeasset.com` 공개 API
+- ACE(한국투자신탁운용): `papi.aceetf.co.kr` 공개 API
 
+KODEX·TIGER·ACE 3개 운용사로 국내 ETF 순자산 기준 약 80%를 커버합니다.
 다른 운용사 ETF는 아직 지원하지 않습니다.
 
 ## 로컬 실행

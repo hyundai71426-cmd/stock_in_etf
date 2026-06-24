@@ -1,11 +1,12 @@
 """
 ETF 구성종목 API
-GET /api/holdings?source=KODEX|TIGER&id=<fId 또는 ISIN>
+GET /api/holdings?source=KODEX|TIGER|ACE&id=<fId/ISIN/fundCd>
 
 KRX 대신 각 운용사 사이트에서 직접 구성종목(PDF, Portfolio Deposit File)을 가져옵니다.
 - KODEX(삼성자산운용): gijunYMD(기준일, YYYYMMDD) 파라미터가 필요하며, 휴장일 대비
   오늘부터 최대 10일 전까지 거슬러 올라가며 데이터가 있는 날짜를 찾습니다.
 - TIGER(미래에셋자산운용): 별도 날짜 파라미터 없이 항상 최신 기준일 데이터를 반환합니다.
+- ACE(한국투자신탁운용): std_dt를 비워두면 항상 최신 기준일 데이터를 반환합니다.
 """
 
 import json
@@ -23,6 +24,7 @@ HEADERS_COMMON = {
 
 KODEX_PDF_URL = "https://www.samsungfund.com/api/v1/kodex/product-pdf/{fid}.do"
 TIGER_PDF_URL = "https://investments.miraeasset.com/tigeretf/ko/product/search/detail/pdfListAjax.ajax"
+ACE_PDF_URL = "https://papi.aceetf.co.kr/api/funds/{fid}/pdf"
 
 
 def _to_float(v):
@@ -103,6 +105,37 @@ def fetch_tiger_holdings(isin):
     return datetime.now().strftime("%Y%m%d"), holdings
 
 
+def fetch_ace_holdings(fid):
+    headers = dict(HEADERS_COMMON)
+    headers["Accept"] = "application/json"
+    headers["Referer"] = f"https://www.aceetf.co.kr/fund/{fid}"
+
+    res = requests.get(
+        ACE_PDF_URL.format(fid=fid),
+        params={"page": "1", "size": "1000", "std_dt": ""},
+        headers=headers,
+        timeout=10,
+    )
+    res.raise_for_status()
+    data = res.json()
+    rows = data.get("pdfList", [])
+
+    used_date = (data.get("std_DT") or "").replace("-", "") or None
+
+    holdings = []
+    for row in rows:
+        holdings.append(
+            {
+                "code": row.get("jm_KSC_CD", ""),
+                "name": row.get("sec_NM", ""),
+                "shares": row.get("cu_ITEM_CNT", ""),
+                "amount": row.get("val_AM", ""),
+                "weight": row.get("wg", "0"),
+            }
+        )
+    return used_date, holdings
+
+
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
@@ -119,6 +152,8 @@ class handler(BaseHTTPRequestHandler):
                 used_date, holdings = fetch_kodex_holdings(item_id)
             elif source == "TIGER":
                 used_date, holdings = fetch_tiger_holdings(item_id)
+            elif source == "ACE":
+                used_date, holdings = fetch_ace_holdings(item_id)
             else:
                 self._send(400, {"error": "지원하지 않는 운용사입니다."})
                 return

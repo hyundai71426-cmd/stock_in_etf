@@ -4,8 +4,8 @@ GET /api/search?q=검색어
 
 종목명(예: KODEX 200) 또는 종목코드(예: 069500)로 한국 상장 ETF를 검색합니다.
 KRX 데이터(data.krx.co.kr)가 로그인을 요구하도록 바뀌어 더 이상 사용할 수 없으므로,
-각 자산운용사(KODEX/삼성자산운용, TIGER/미래에셋자산운용)가 공개하는 데이터를
-직접 수집합니다.
+각 자산운용사(KODEX/삼성자산운용, TIGER/미래에셋자산운용, ACE/한국투자신탁운용)가
+공개하는 데이터를 직접 수집합니다.
 """
 
 import json
@@ -24,6 +24,7 @@ HEADERS_COMMON = {
 
 KODEX_LIST_URL = "https://www.samsungfund.com/api/v1/kodex/product.do"
 TIGER_LIST_URL = "https://investments.miraeasset.com/tigeretf/ko/product/search/list.ajax"
+ACE_LIST_URL = "https://papi.aceetf.co.kr/api/funds"
 
 # 같은 서버리스 인스턴스 내에서 재사용하는 캐시 (콜드스타트마다 초기화됨)
 _cache = {"date": None, "data": None}
@@ -33,6 +34,13 @@ _CACHE_TTL = timedelta(minutes=30)
 # 받아와야 한다. 순차로 받으면 느려서 병렬로 요청한다.
 KODEX_MAX_PAGES = 15
 KODEX_WORKERS = 8
+
+
+def _isin_to_code(isin):
+    """한국 ISIN(KR7XXXXXX###)에서 6자리 단축코드를 뽑아낸다. 예: KR7292150000 -> 292150."""
+    if isin and isin.startswith("KR") and len(isin) >= 9:
+        return isin[3:9]
+    return ""
 
 
 def _fetch_kodex_page(session, page):
@@ -113,9 +121,43 @@ def fetch_tiger_list():
                 "source": "TIGER",
                 "id": isin,
                 "isin": isin,
-                "code": "",
+                "code": _isin_to_code(isin),
                 "name": name,
                 "company": "미래에셋자산운용",
+            }
+        )
+    return items
+
+
+def fetch_ace_list():
+    """ACE(한국투자신탁운용) 전체 ETF 목록. size를 크게 주면 한 번에 전체가 온다."""
+    params = {
+        "isAceEtfPlus": "false",
+        "page": "1",
+        "pensionType": "",
+        "searchValue": "",
+        "size": "500",
+        "sort": "MM1_ERN_RT_DESC",
+    }
+    headers = dict(HEADERS_COMMON)
+    headers["Accept"] = "application/json"
+    headers["Referer"] = "https://www.aceetf.co.kr/"
+
+    res = requests.get(ACE_LIST_URL, params=params, headers=headers, timeout=10)
+    res.raise_for_status()
+    rows = res.json().get("data", [])
+
+    items = []
+    for row in rows:
+        isin = row.get("stockCd", "")
+        items.append(
+            {
+                "source": "ACE",
+                "id": row.get("fundCd", ""),
+                "isin": isin,
+                "code": _isin_to_code(isin),
+                "name": row.get("fundNm", ""),
+                "company": "한국투자신탁운용",
             }
         )
     return items
@@ -127,11 +169,11 @@ def fetch_all_etfs():
         return _cache["data"]
 
     data = []
-    # KODEX/TIGER 두 운용사 목록도 서로 독립적이므로 동시에 받아온다.
-    with ThreadPoolExecutor(max_workers=2) as pool:
+    # 세 운용사 목록은 서로 독립적이므로 동시에 받아온다.
+    with ThreadPoolExecutor(max_workers=3) as pool:
         futures = {
             pool.submit(fetcher): fetcher.__name__
-            for fetcher in (fetch_kodex_list, fetch_tiger_list)
+            for fetcher in (fetch_kodex_list, fetch_tiger_list, fetch_ace_list)
         }
         for future in as_completed(futures):
             try:
