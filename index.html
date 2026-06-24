@@ -150,7 +150,7 @@
 <body>
 <div class="wrap">
   <h1>ETF 구성종목 검색</h1>
-  <p class="sub">종목명 또는 종목코드를 입력하면 국내 ETF의 구성종목을 보여줍니다. (KRX 데이터 기준)</p>
+  <p class="sub">종목명 또는 종목코드를 입력하면 국내 ETF의 구성종목을 보여줍니다. (KODEX·TIGER 운용사 공시 기준)</p>
 
   <div class="search-box">
     <input type="text" id="searchInput" placeholder="예: KODEX 200, 069500" autocomplete="off" />
@@ -196,26 +196,26 @@ async function search(q) {
 function renderResults(results) {
   $panel.style.display = 'block';
   $panel.innerHTML = results.map(r => `
-    <div class="result-item" data-isin="${r.isin}" data-name="${r.name}">
+    <div class="result-item" data-source="${r.source}" data-id="${r.id}" data-name="${r.name}">
       <div>
         <div class="result-name">${r.name}</div>
-        <div class="result-meta">${r.company || ''} ${r.indexName ? '· ' + r.indexName : ''}</div>
+        <div class="result-meta">${r.company || ''}</div>
       </div>
-      <div class="result-code">${r.code}</div>
+      <div class="result-code">${r.code || ''}</div>
     </div>
   `).join('');
 
   $panel.querySelectorAll('.result-item').forEach(el => {
     el.addEventListener('click', () => {
-      loadHoldings(el.dataset.isin, el.dataset.name);
+      loadHoldings(el.dataset.source, el.dataset.id, el.dataset.name);
     });
   });
 }
 
-async function loadHoldings(isin, name) {
+async function loadHoldings(source, id, name) {
   showState('구성종목 불러오는 중...');
   try {
-    const res = await fetch(`/api/holdings?isin=${encodeURIComponent(isin)}`);
+    const res = await fetch(`/api/holdings?source=${encodeURIComponent(source)}&id=${encodeURIComponent(id)}`);
     const data = await res.json();
     if (!res.ok) { showState(data.error || '조회에 실패했습니다.'); return; }
     renderHoldings(name, data);

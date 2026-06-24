@@ -1,13 +1,19 @@
 # ETF 구성종목 검색 (한국 ETF)
 
-종목명/코드로 검색하면 KRX 데이터 기준 ETF 구성종목을 보여주는 웹서비스입니다.
+종목명/코드로 검색하면 ETF 구성종목을 보여주는 웹서비스입니다.
 
 ## 구조
 - `index.html` — 검색 UI (정적 파일)
 - `api/search.py` — 종목명/코드로 ETF 찾기 (`GET /api/search?q=검색어`)
-- `api/holdings.py` — ETF 구성종목 조회 (`GET /api/holdings?isin=ISIN코드`)
+- `api/holdings.py` — ETF 구성종목 조회 (`GET /api/holdings?source=KODEX|TIGER&id=식별자`)
 
-데이터는 KRX 정보데이터시스템(data.krx.co.kr)의 공개 API를 서버에서 호출합니다. 회원가입이나 API 키가 필요 없습니다.
+KRX 정보데이터시스템(data.krx.co.kr)이 2026년 1월부터 로그인을 요구하도록 바뀌어
+더 이상 비로그인으로 사용할 수 없습니다. 대신 각 자산운용사가 회원가입 없이 공개하는
+데이터를 직접 수집합니다.
+- KODEX(삼성자산운용): `samsungfund.com` 공개 API
+- TIGER(미래에셋자산운용): `investments.miraeasset.com` 공개 API
+
+다른 운용사 ETF는 아직 지원하지 않습니다.
 
 ## 로컬 실행
 ```bash
